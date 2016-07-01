@@ -30,11 +30,7 @@ def main():
     fig = plt.gcf()
     ax = plt.gca()
 
-    print "ax.lines = ", ax.lines
-
     blue_line = ax.lines[0]
-
-    print "type(blue_line) = ", type(blue_line)
 
     plt.xlabel('Time')
     plt.ylabel('Amplitude')
@@ -81,7 +77,81 @@ def main():
 
     plt.savefig('figure_1-4.svg')
 
-    ns.Plotter.show()
+    #--------------------------------------------------------------------------
+    # figure 2
+
+    signal.plot('3 Hz Signal')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-1.05, 1.05])
+
+    plt.savefig('figure_2-0.svg')
+
+    # multiply the signal by a gaussian
+
+    s1 = signal * gen.drawGaussian(1.0, 0.33, 0.15)
+
+    s1.plot('3 Hz Signal * env')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-1.05, 1.05])
+
+    plt.savefig('figure_2-1.svg')
+
+    # multiply the signal by a gaussian
+
+    s2 = signal * gen.drawGaussian(1.0, 0.5, 0.15)
+
+    s2.plot('3 Hz Signal * env')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-1.05, 1.05])
+
+    plt.savefig('figure_2-2.svg')
+
+    # multiply the signal by a gaussian
+
+    s3 = signal * gen.drawGaussian(1.0, 0.66, 0.15)
+
+    s3.plot('3 Hz Signal * env')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-1.05, 1.05])
+
+    plt.savefig('figure_2-3.svg')
+
+
+    # multiply the signal by a gaussian
+
+    s4 = signal * (0.05 + gen.drawGaussian(1.0, 0.66, 0.15))
+    s4.normalize();
+
+    s4.plot('3 Hz Signal & ???')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-1.05, 1.05])
+
+    plt.savefig('figure_2-4.svg')
+
+
+    plt.show()
+
+
 
 
 if __name__ == "__main__":
