@@ -19,12 +19,24 @@ assert sys.version_info.major == 2, "python 2 only!"
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.io.wavfile import read as wavread
+#~from scipy.io.wavfile import read as _wavread  # broken!
+
+# Using Nsound to read wavefile since scipy 0.13.3 is broken for stereo, int32 files
+
+import Nsound as ns
 
 
 def main():
 
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c',
+        '--channel',
+        type = int,
+        default = None,
+        help = 'Selectes one channel if the input wave contains multiple channels',
+    )
 
     parser.add_argument(
         'input_wav',
@@ -41,13 +53,22 @@ def main():
 
     sr, x = wavread(args.input_wav)
 
+    if x.ndim > 1:
+
+        if args.channel is not None:
+            x = x[:, args.channel]
+
+        else:
+            raise RuntimeError(
+                'Input wav has %d channles, use --channels to select one' % x.ndim
+            )
+
     #-----------------------------------------------------------------------------
     # compute spectrogram
 
     cfg = Stft.get_defaults()
 
     cfg['sample_rate'] = sr
-    cfg['t_step'] = 0.05
 
     stft_op = Stft(**cfg)
 
@@ -59,10 +80,10 @@ def main():
     time_axis = data['stft_time_axis']
     freq_axis = data['stft_freq_axis']
 
-    amp = np.abs(data['stft_spec'])
+    amp = np.abs(data['stft_spec']) ** 0.33
 
     plt.figure()
-    imagesc(time_axis, freq_axis, amp.T ** 0.333, cmap = 'bone')
+    imagesc(time_axis, freq_axis, amp.T, cmap = 'bone')
     plt.xlabel('Time (s)')
     plt.ylabel('Frequency (Hz)')
     plt.title('Spectrogram: %s' % os.path.basename(args.input_wav))
@@ -216,18 +237,7 @@ class Stft:
             if pad_r > 0:
                 s = np.hstack([s, np.zeros((pad_r), np.float32)])
 
-            if i == 49:
-                plt.figure()
-                plt.plot(s)
-                plt.grid(True)
-                plt.title('s')
-
-                plt.figure()
-                plt.plot(self._window)
-                plt.grid(True)
-                plt.title('window')
-
-            s *= self._window
+            s = s * self._window
 
             spec[i,:] = np.fft.rfft(s)
 
@@ -448,6 +458,28 @@ def imagesc(x_axis, y_axis, Z, axes = None, **kwargs):
     ax.axis("tight")
 
     return h
+
+
+def wavread(filename):
+
+    import Nsound as ns
+
+    a = ns.AudioStream(filename)
+
+    sr = a.getSampleRate()
+
+    n_channels = a.getNChannels()
+    n_samples = a.getLength()
+
+    x = np.zeros((n_samples, n_channels), np.float32)
+
+    for c in range(n_channels):
+        x[:,c] = a[c].toList()
+
+    x = np.squeeze(x) # remove singular dimensions if present
+
+    return sr, x
+
 
 
 if __name__ == "__main__":
