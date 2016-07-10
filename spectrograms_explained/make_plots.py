@@ -1,5 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches
 import numpy as np
 import Nsound as ns
 
@@ -148,6 +149,102 @@ def main():
 
     plt.savefig('figure_2-4.svg')
 
+    #--------------------------------------------------------------------------
+    # figure 3
+
+    signal.plot('3 Hz Signal')
+
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+
+    plt.xlim([-0.15, 1.15])
+    plt.ylim([-1.15, 1.15])
+
+    plt.savefig('figure_3-0.svg')
+
+    # add red rectangle
+
+    cx = 0.5
+    cy = 0
+    w = 1.10
+    h = 2.10
+
+    xy = [cx - 0.5 * w, cy - 0.5 * h]
+
+    r = matplotlib.patches.Rectangle(
+        xy,
+        width = w,
+        height = h,
+        ec = 'red',
+        fc = 'none',
+    )
+
+    ax = plt.gca()
+
+    ax.add_patch(r)
+
+    plt.savefig('figure_3-0.svg')
+
+    # shrink rectangle
+
+    w *= 0.666
+
+    x = cx - 0.5 * w
+
+    r.set_x(x)
+    r.set_width(w)
+
+    ax.figure.canvas.draw()
+
+    plt.savefig('figure_3-1.svg')
+
+    # shrink rectangle
+
+    w *= 0.333
+
+    x = cx - 0.5 * w
+
+    r.set_x(x)
+    r.set_width(w)
+
+    ax.figure.canvas.draw()
+
+    plt.savefig('figure_3-2.svg')
+
+
+    #--------------------------------------------------------------------------
+    # figure 4
+
+    sig = signal
+
+    time_axis = np.linspace(0, 1.0, len(sig))
+
+    rec_dict = dict(xy = (0,-1), width=1, height=2, ec = 'red', fc = 'none')
+
+    freqs = [6, 4.5, 3.3, 3.1]
+
+    for i, f in enumerate(freqs):
+
+        sig2 = gen.drawSine(1.0, f)
+
+        tones = (sig + sig2) / 2.0
+
+        plt.figure()
+        plt.plot(time_axis, tones[0].toList())
+        plt.grid(True)
+
+        plt.xlabel('Time')
+        plt.ylabel('Amplitude')
+
+        plt.xlim([-0.15, 1.15])
+        plt.ylim([-1.15, 1.15])
+        plt.title('3 Hz + %.1f Hz' % f)
+
+        r = matplotlib.patches.Rectangle(**rec_dict)
+        ax = plt.gca()
+        ax.add_patch(r)
+
+        plt.savefig('figure_4-%d.svg' % i)
 
     plt.show()
 
