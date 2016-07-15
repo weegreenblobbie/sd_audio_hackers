@@ -1,3 +1,6 @@
 *.svg
 *.~lock.*
+*~
+*.pyc
+*.pyo
 
