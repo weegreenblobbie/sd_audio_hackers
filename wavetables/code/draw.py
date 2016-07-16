@@ -15,7 +15,7 @@ def line(sr, dur, v0, v1):
     v1 = constant, end value
     '''
 
-    n_samples = _get_n_samples(sr, dur)
+    n_samples = get_n_samples(sr, dur)
 
     return np.linspace(v0, v1, n_samples).astype(np.float32)
 
@@ -34,10 +34,13 @@ def sine(sr, dur, freq, phase = None):
         1.0 = pi = 180 degrees
     '''
 
-    if not callable(phase):
+    if phase is None:
         phase = lambda : 0
 
-    n_samples = _get_n_samples(sr, dur)
+    assert callable(freq), "freq must be a callable object"
+    assert callable(phase), "phase must be a callable object"
+
+    n_samples = get_n_samples(sr, dur)
 
     tau = 1.0 / sr
 
@@ -54,7 +57,11 @@ def sine(sr, dur, freq, phase = None):
     return out
 
 
-def _get_n_samples(sr, dur):
+#------------------------------------------------------------------------------
+# utils
+
+
+def get_n_samples(sr, dur):
 
     assert sr > 0, "sr <= 0"
     assert dur > 0, "dur <= 0"
