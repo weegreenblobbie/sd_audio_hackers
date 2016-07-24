@@ -30,6 +30,13 @@ def main():
     plt.grid(True)
     plt.title('Sine wave: f = %d Hz' % _3_hz())
 
+    x = draw.sine(sr, dur, _3_hz, Constant(0.5))
+
+    plt.figure()
+    plt.plot(x)
+    plt.grid(True)
+    plt.title('Cosine wave: f = %d Hz' % _3_hz())
+
     f_3_10 = Circular(draw.line(sr, dur, 3, 10))
 
     x = draw.sine(sr, dur, f_3_10)
