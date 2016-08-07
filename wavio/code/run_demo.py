@@ -8,8 +8,13 @@ def main():
 
     files = [
         "/home/nhilton/development/nsound/src/examples/california.wav",
+        "/home/nhilton/development/nsound/src/examples/california.wav",
+        "/home/nhilton/development/nsound/src/examples/mynameis.wav",
+        "/home/nhilton/development/nsound/src/examples/Temperature_in.wav",
+        "/home/nhilton/development/nsound/src/examples/walle.wav",
         "/home/nhilton/development/nsound/src/examples/example1",
         "empty.bin",
+        "chirp1.wav",
     ]
 
     for f in files:
