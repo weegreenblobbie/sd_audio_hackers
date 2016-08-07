@@ -437,18 +437,129 @@ def read(filename, dtype = np.float32):
     return the raw type.
     """
 
+    if dtype is not None:
+        assert dtype in [np.float32, np.float64], 'dtype must be None, np.float32 or np.float64'
+
     chunks = read_chunks(filename)
+
+    # interpret the format chunk dtype
+
+    dt = chunks['fmt ']['dtype']
+
+    if   dt == 'uint8':   dt = np.uint8; bps = 1
+    elif dt == 'int16':   dt = np.int16; bps = 2
+    elif dt == 'int32':   dt = np.int32; bps = 4
+    elif dt == 'int64':   dt = np.int64; bps = 8
+    elif dt == 'float32': dt = np.float32; bps = 4
+    elif dt == 'float64': dt = np.float64; bps = 8
+    else:
+        raise RuntimeError("Don't know how to interpret data chunk!")
+
+    #--------------------------------------------------------------------------
+    # read the data chunk
+
+    # compute number of samples per channel
+
+    n_channels = chunks['fmt ']['channels']
+    bytes_per_sample = chunks['fmt ']['bits_per_sample'] // 8  # magic number
 
     pos = chunks['data']['pos']
     size = chunks['data']['size']
 
     with open(filename, 'rb') as fd:
-        fd.seek(data_pos)
+        fd.seek(pos)
         raw = fd.read(size)
 
+    n_samples = int(len(raw) / (n_channels * bytes_per_sample))
+
+    data = np.zeros((n_samples, n_channels), dt)
+
+    frame_size = int(n_channels * bytes_per_sample)
+
+    # FIXME: if bytes are aligned, then one can create a np.array of bytes
+    # and then call np.viewas(), which would be very fast, then slice it to
+    # remove the intrerlace.
+    #
+    # For now this is generic and slow.  (nh 2016-08-07)
+
+    for i in range(n_samples):
+
+        for j in range(n_channels):
+
+            # compute slice
+
+            i0 = i * frame_size
+            i1 = i0 + bytes_per_sample
+
+            s = raw[i0 : i1]
+
+            data[i, j] = _bytes_to_dtype(s, dt)
+
+    #--------------------------------------------------------------------------
+    # convert to requested dtype
+
+    if dtype is None:
+        return data
+
+    scale = 1.0
+
+    if dt == np.uint8:
+        data = data.astype(dtype)
+
+        data /= 255.0
+        data -= 0.5
+
+    elif dt == np.int16:
+        data = data.astype(dtype)
+        data /= 2.0 ** 15
+
+    elif dt == np.int32:
+
+        if bytes_per_sample == 3:
+            scale = 2.0 ** 23
+        else:
+            scale = 2.0 ** 31
+
+        data = data.astype(np.float64)
+        data /= scale
+        data = data.astype(dtype)
+
+    elif dt == np.int64:
+        data = data.astype(np.float64)
+        data /= 2.0 ** 63
+        data = data.astype(dtype)
+
+    elif dt in [np.float32, np.float64]:
+        pass
+
+    return data
 
 
+def _bytes_to_dtype(s, dt):
 
+    n_bytes = len(s)
 
+    if   dt == np.uint8: return struct.unpack('<B', s)[0]
+    elif dt == np.int16: return struct.unpack('<h', s)[0]
+    elif dt == np.int32 and n_bytes == 3:
 
+        # handle special case for signed 24 bit ints
 
+        # convert to uint8 first
+
+        s = struct.unpack('BBB', s)
+
+        sample = s[0] + (s[1] << 8) + (s[2] << 16)
+
+        # sign extend
+
+        if sample & 0x800000 != 0:
+            sample -= 0x0FFFFFF
+
+        return sample
+
+    elif dt == np.int32 and n_bytes == 4: return struct.unpack('<i', s)[0]
+    elif dt == np.float32: return struct.unpack('<f', s)[0]
+    elif dt == np.float64: return struct.unpack('<d', s)[0]
+
+    raise RuntimeError('oops, dt == %s' % dt)

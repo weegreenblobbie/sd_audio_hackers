@@ -1,5 +1,6 @@
 import json
 
+import matplotlib.pyplot as plt
 
 import wavio
 
@@ -7,7 +8,6 @@ import wavio
 def main():
 
     files = [
-        "/home/nhilton/development/nsound/src/examples/california.wav",
         "/home/nhilton/development/nsound/src/examples/california.wav",
         "/home/nhilton/development/nsound/src/examples/mynameis.wav",
         "/home/nhilton/development/nsound/src/examples/Temperature_in.wav",
@@ -31,9 +31,22 @@ def main():
             for line in s.split('\n'):
                 print('    %s' % line)
 
+            data = wavio.read(f)
+
+            if data.ndim > 1:
+                data = data[:,0]
+
+            plt.figure()
+            plt.plot(data, 'b-')
+            plt.grid(True)
+            plt.xlabel('sample bin')
+            plt.ylabel('amplitude')
+            plt.title('wav = %s' % f)
 
         except wavio.InvalidRiffWave:
             print("    Not a RIFF WAVE!")
+
+    plt.show()
 
 
 if __name__ == "__main__":
