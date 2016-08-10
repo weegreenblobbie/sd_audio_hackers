@@ -17,7 +17,7 @@ byte 0:3  |      'R'       |       'I'       |       'F'     |     'F'       |
           --------------------------------------------------------------------
 byte 4:7  |                          uint32 RIFF chunk size                  |
           --------------------------------------------------------------------
-byte 8:10 |      'W'       |       'A'       |       'V'     |     'E'       |
+byte 8:11 |      'W'       |       'A'       |       'V'     |     'E'       |
           --------------------------------------------------------------------
 
 Where "RIFF chunk size" is the total size of the file in bytes, excluding the
@@ -98,6 +98,7 @@ if sys.version_info[0] != 3:
 class InvalidRiffWave(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
 
 class WavIOError(Exception):
     def __init__(self, *args, **kwargs):
@@ -197,7 +198,7 @@ def _read_fmt(fd, tag):
 
     dtype = 'unknown'
 
-    if format == "Microsoft PCM":
+    if fmt_type == FMT_PCM:
 
         if bits_per_sam == 8:
             dtype = 'uint8'
@@ -211,7 +212,7 @@ def _read_fmt(fd, tag):
         elif bits_per_sam == 64:
             dtype = 'int64'
 
-    elif format == "IEEE Float":
+    elif fmt_type == FMT_IEEE:
 
         if bits_per_sam == 32:
             dtype = 'float32'
@@ -222,7 +223,8 @@ def _read_fmt(fd, tag):
     return dict(
         tag = tag,
         size = size,
-        format = format,
+        format = fmt_type,
+        format_id = format,
         channels = channels,
         sample_rate = sample_rate,
         bytes_per_second = bytes_per_sec,
@@ -269,12 +271,16 @@ def _read_tag(fd, tag):
     return dict(tag = tag)
 
 
+FMT_PCM  = 0x0001
+FMT_IEEE = 0x0003
+
+
 def _fmt_type_to_str(typ):
 
     if   typ == 0x0000: return "Unknown"
-    elif typ == 0x0001: return "Microsoft PCM"
+    elif typ == FMT_PCM: return "Microsoft PCM"
     elif typ == 0x0002: return "Microsoft ADPCM"
-    elif typ == 0x0003: return "IEEE Float"
+    elif typ == FMT_IEEE: return "IEEE Float"
     elif typ == 0x0004: return "Compaq VSELP"
     elif typ == 0x0005: return "IBM CVSD"
     elif typ == 0x0006: return "Microsoft ALAW"
@@ -488,7 +494,7 @@ def read(filename, dtype = np.float32):
 
             # compute slice
 
-            i0 = i * frame_size
+            i0 = i * frame_size + j * bytes_per_sample
             i1 = i0 + bytes_per_sample
 
             s = raw[i0 : i1]
@@ -501,13 +507,10 @@ def read(filename, dtype = np.float32):
     if dtype is None:
         return data
 
-    scale = 1.0
-
     if dt == np.uint8:
         data = data.astype(dtype)
-
-        data /= 255.0
-        data -= 0.5
+        data -= 127.0
+        data /= 128.0
 
     elif dt == np.int16:
         data = data.astype(dtype)
@@ -532,7 +535,7 @@ def read(filename, dtype = np.float32):
     elif dt in [np.float32, np.float64]:
         pass
 
-    return data
+    return data, chunks['fmt ']['sample_rate']
 
 
 def _bytes_to_dtype(s, dt):
@@ -559,7 +562,233 @@ def _bytes_to_dtype(s, dt):
         return sample
 
     elif dt == np.int32 and n_bytes == 4: return struct.unpack('<i', s)[0]
+    elif dt == np.int64 and n_bytes == 8: return struct.unpack('<q', s)[0]
     elif dt == np.float32: return struct.unpack('<f', s)[0]
     elif dt == np.float64: return struct.unpack('<d', s)[0]
 
     raise RuntimeError('oops, dt == %s' % dt)
+
+
+_dtype_to_bits = {
+    np.uint8   : 8 ,
+    np.int16   : 16,
+    np.int32   : 32,
+    np.int64   : 64,
+    np.float32 : 32,
+    np.float64 : 64,
+}
+
+
+def write(filename, x, sr, nbits = None, dtype = None):
+    """
+    Writes a RIFF WAVE to 'filename' using the samples in x.
+    """
+
+    print("x.dtype = %s" % x.dtype)
+
+    src_dtype = x.dtype
+    dst_dtype = dtype
+
+    if nbits is None and dst_dtype is None:
+        nbits = 16
+        dst_dtype = np.int16
+
+    elif nbits is None:
+
+        try:
+            nbits = _dtype_to_bits[dst_dtype]
+
+        except KeyError:
+            raise ValueError('unsupported dtype %s' % dst_dtype)
+
+    elif dst_dtype is None:
+
+        if nbits == 8:
+            dst_dtype = np.uint8
+
+        elif nbits == 16:
+            dst_dtype = np.int16
+
+        elif nbits in [24, 32]:
+            dst_dtype = np.int32
+
+        elif nbits == 64:
+            dst_dtype = np.int64
+
+        else:
+            raise ValueError("don't know how to deal with nbits = %d" % nbits)
+
+    else:
+        raise RuntimeError('oops')
+
+    assert nbits is not None
+    assert dst_dtype is not None
+
+    if src_dtype == np.int64 and dst_dtype != np.int64:
+        import warnings
+        warnings.warn('possible loss of precsion: %s --> %s' % (src_dtype, dst_dtype))
+
+    # convert integer types to float32/float64
+
+    if src_dtype == np.uint8:
+        x = x.astyep(np.float32)
+        x -= 127.0
+        x /= 128.0
+
+    elif src_dtype == np.int16:
+        x = x.astype(np.float32)
+        x /= 2.0 ** 15
+
+    elif src_dtype == np.int32:
+        x = x.astype(np.float64)
+        x /= 2.0 ** 31
+
+    elif src_dtype == np.int64:
+        x = x.astype(np.float64)
+        x /= 2.0 ** 63
+
+    src_dtype = x.dtype
+
+    # convert x into a byte stream
+
+    assert x.ndim <= 2, 'x must be 1D or 2D'
+
+    n_samples = x.shape[0]
+
+    if x.ndim == 1:
+        x = x.reshape((n_samples, 1))
+
+    n_samples, n_channels = x.shape
+
+    bytes_per_sample = nbits // 8
+
+    frame_size = int(n_channels * bytes_per_sample)
+
+    data_out = [0] * frame_size * n_samples
+
+    for i in range(n_samples):
+
+        for j in range(n_channels):
+
+            # compute slice
+
+            i0 = i * frame_size + j * bytes_per_sample
+            i1 = i0 + bytes_per_sample
+
+            tmp = _to_bytes(dst_dtype, nbits, x[i, j])
+
+            data_out[i0 : i1] = tmp
+
+    fmt = '%dB' % len(data_out)
+
+    data_out = struct.pack(fmt, *data_out)
+
+    #--------------------------------------------------------------------------
+    # write out wav
+
+    if dst_dtype in [np.float32, np.float64]:
+        fmt_type = FMT_IEEE
+    else:
+        fmt_type = FMT_PCM
+
+    riff_chunksize = len(data_out) + 44
+
+    bytes_per_sec = sr * frame_size
+
+    with open(filename, 'wb') as fd:
+
+        # riff header
+
+        fd.write(b'RIFF')
+        fd.write(struct.pack('<I', riff_chunksize))
+        fd.write(b'WAVE')
+
+        # fmt chunk
+
+        fd.write(b'fmt ')
+        fd.write(struct.pack('<I', 16))
+        fd.write(struct.pack('<H', fmt_type))
+        fd.write(struct.pack('<H', n_channels))
+        fd.write(struct.pack('<I', int(sr)))
+        fd.write(struct.pack('<I', bytes_per_sec))
+        fd.write(struct.pack('<H', frame_size))
+        fd.write(struct.pack('<H', nbits))
+
+        # write data chunk
+
+        fd.write(b'data')
+        fd.write(struct.pack('<I', len(data_out)))
+        fd.write(data_out)
+
+
+def _to_bytes(dst_dtype, nbits, sample):
+    """
+    converstion matrix from src_dtype to dst_dtype
+    """
+
+    s = sample
+
+    if dst_dtype == np.uint8:
+
+        so = s
+        s *= 127.0
+        s += 127.0
+
+        try:
+            return struct.pack('B', int(s))
+        except struct.error:
+            print('s = %d' % so)
+            print('u8 = %d' % s)
+            raise
+
+
+    elif dst_dtype == np.int16:
+        s *= 2 ** 15
+        return struct.pack('<h', int(s))
+
+    elif dst_dtype == np.int32:
+
+        if nbits == 32:
+            s *= 2 ** 31
+            return struct.pack('<i', int(s))
+
+        # special case for 24 bit ints
+
+        s *= 2 ** 23
+
+        s = int(s)
+
+        if s < 0:
+            s += 0x0FFFFFF
+
+        s &= 0x00FFFFFF
+
+        b0 = s & 0x00000FF
+        b1 = (s & 0x000FF00) >> 8
+        b2 = (s & 0x0FF0000) >> 16
+
+        return struct.pack('BBB', b0, b1, b2)
+
+    elif dst_dtype == np.int64:
+        s *= 2 ** 63
+        return struct.pack('<q', int(s))
+
+    elif dst_dtype == np.float32:
+
+        fmt = '<f'
+
+        if nbits == 64:
+            fmt = '<d'
+
+        return struct.pack(fmt, float(s))
+
+    elif dst_dtype == np.float64:
+
+        fmt = '<d'
+
+        if nbits == 32:
+            fmt = '<f'
+
+        return struct.pack(fmt, float(s))
+
+    raise RuntimeError('oops: dst_dtype = %s, nbits = %d' % (dst_dtype, nbits))
