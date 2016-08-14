@@ -6,7 +6,7 @@
 
     pith -u runscripts/run_sawtooth.py
 
-# Play the generated autio
+# Play the generated audio
 
     aplay saw-no-chorus.wav saw-with-chorus.wav saw-ramp-no-chorus.wav saw-ramp-with-chorus.wav
 
