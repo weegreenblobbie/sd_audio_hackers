@@ -4,4 +4,4 @@
 
 # Run demo
 
-    pith runscripts/run_sawtooth.py
+    pith -u runscripts/run_sawtooth.py
