@@ -580,8 +580,6 @@ def write(filename, x, sr, nbits = None, dtype = None):
     Writes a RIFF WAVE to 'filename' using the samples in x.
     """
 
-    print("x.dtype = %s" % x.dtype)
-
     src_dtype = x.dtype
     dst_dtype = dtype
 
@@ -730,13 +728,7 @@ def _to_bytes(dst_dtype, nbits, sample):
         s *= 127.0
         s += 127.0
 
-        try:
-            return struct.pack('B', int(s))
-        except struct.error:
-            print('s = %d' % so)
-            print('u8 = %d' % s)
-            raise
-
+        return struct.pack('B', int(s))
 
     elif dst_dtype == np.int16:
         s *= 2 ** 15
