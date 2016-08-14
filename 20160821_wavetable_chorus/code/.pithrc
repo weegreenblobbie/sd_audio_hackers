@@ -1,0 +1,8 @@
+[pith]
+
+interpreter = python3
+
+# pythonpath =
+
+verbose = true
+

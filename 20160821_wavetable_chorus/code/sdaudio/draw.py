@@ -6,6 +6,7 @@ import numpy as np
 
 
 from sdaudio import assert_py3
+from sdaudio.callables import Circular
 
 
 def line(sr, dur, v0, v1):
@@ -56,6 +57,38 @@ def sine(sr, dur, freq, phase = None):
         out[i] = np.sin(2 * np.pi * t * tau + np.pi * phase())
 
         t += freq()
+
+    return out
+
+
+def sawtooth(sr, dur, freq, n = 5):
+    '''
+
+    draws a sawtooth wave
+
+    Reference: https://en.wikipedia.org/wiki/Sawtooth_wave
+
+    '''
+
+    assert callable(freq), "freq must be a callable object"
+
+    n_samples = get_n_samples(sr, dur)
+
+    # Turn the callable freq into a numpy array
+
+    frqs = np.array([freq() for x in range(n_samples)], np.float32)
+
+    out = np.zeros(n_samples, np.float32)
+
+    for i in range(n):
+
+        k = i + 1.0
+
+        f = Circular(k * frqs)
+
+        out += -1 ** k * (sine(sr, dur, f) / k)
+
+    out =  2 * out / np.pi
 
     return out
 

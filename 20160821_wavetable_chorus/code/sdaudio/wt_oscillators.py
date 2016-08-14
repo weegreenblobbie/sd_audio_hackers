@@ -7,6 +7,7 @@ import numpy as np
 
 from sdaudio import assert_py3
 from sdaudio.draw import get_n_samples
+from sdaudio.callables import Circular
 
 
 class Nearest(object):
@@ -157,4 +158,43 @@ class Lininterp(object):
             out[i] = sample
 
         return out
+
+
+class Choruses(object):
+    '''
+    A wavetable oscillator with chorus.
+    '''
+
+    def __init__(self, sr, table, chorus):
+
+        assert len(chorus) > 1, 'len(chorus) <= 0'
+
+        self._oscillator = Lininterp(sr, table)
+
+        self._chorus = np.array(chorus)
+
+        self._sr = sr
+
+
+    def generate(self, dur, freq, phase = None):
+
+        assert callable(freq), "freq must be a callable object"
+
+        # Turn the callable freq into a numpy array
+
+        n_samples = get_n_samples(self._sr, dur)
+
+        frqs = np.array([freq() for x in range(n_samples)], np.float32)
+
+        c0 = self._chorus[0]
+
+        out = self._oscillator.generate(n_samples, Circular(c0 * frqs), phase)
+
+        for c in self._chorus[1:]:
+
+            out += self._oscillator.generate(n_samples, Circular(c * frqs), phase)
+
+        scale = 1.0 / len(self._chorus)
+
+        return out * scale
 
